@@ -1,0 +1,684 @@
+# PROJECT LENS - COMPREHENSIVE CODEBASE CONTEXT
+
+## 📋 PROJECT OVERVIEW
+
+**Project Name:** Project Lens
+**Type:** React TypeScript Application with Supabase Backend
+**Purpose:** AI-powered documentation generator for codebases
+**Architecture:** Full-stack SaaS application with subscription management
+**Deployment:** Netlify (Frontend) + Supabase (Backend/Database)
+**Live URL:** https://zippy-gecko-62f464.netlify.app
+
+## 🏗️ ARCHITECTURE OVERVIEW
+
+### Frontend Architecture
+- **Framework:** React 18.3.1 with TypeScript
+- **Build Tool:** Vite 5.4.2
+- **Styling:** Tailwind CSS 3.4.1
+- **State Management:** React Context API + Hooks
+- **Routing:** React Router DOM 6.20.1
+- **Animations:** Framer Motion 10.18.0
+- **Icons:** Lucide React 0.344.0
+
+### Backend Architecture
+- **Database:** Supabase PostgreSQL
+- **Authentication:** Supabase Auth with email verification
+- **Real-time:** Supabase Realtime subscriptions
+- **File Storage:** Browser-based (no server storage)
+- **API:** Supabase REST API + Edge Functions
+
+### External Integrations
+- **Payment Processing:** Stripe (Checkout + Webhooks)
+- **AI Services:** Google Gemini API for advanced features
+- **File Processing:** JSZip for archive handling
+
+## 📁 PROJECT STRUCTURE
+
+```
+project-lens/
+├── src/
+│   ├── components/           # React components
+│   ├── contexts/            # React contexts
+│   ├── data/               # Sample data
+│   ├── lib/                # External service clients
+│   ├── utils/              # Utility functions
+│   ├── types.ts            # TypeScript definitions
+│   ├── App.tsx             # Main app component
+│   └── main.tsx            # App entry point
+├── supabase/
+│   ├── functions/          # Edge functions
+│   └── migrations/         # Database migrations
+├── public/                 # Static assets
+└── [config files]         # Build/dev configuration
+```
+
+## 🗄️ DATABASE SCHEMA
+
+### Core Tables
+
+#### 1. users
+```sql
+- id: UUID (PK, references auth.users)
+- email: TEXT (unique)
+- full_name: TEXT
+- avatar_url: TEXT
+- created_at: TIMESTAMPTZ
+- updated_at: TIMESTAMPTZ
+```
+
+#### 2. user_subscriptions
+```sql
+- id: UUID (PK)
+- user_id: UUID (FK to users)
+- plan_type: TEXT ('free' | 'pro')
+- usage_count: INTEGER (default 0)
+- usage_limit: INTEGER (default 5)
+- stripe_customer_id: TEXT
+- stripe_subscription_id: TEXT
+- current_period_start: TIMESTAMPTZ
+- current_period_end: TIMESTAMPTZ
+- status: TEXT ('active' | 'canceled' | 'past_due' | 'trialing')
+- created_at: TIMESTAMPTZ
+- updated_at: TIMESTAMPTZ
+```
+
+#### 3. usage_logs
+```sql
+- id: UUID (PK)
+- user_id: UUID (FK to users)
+- action_type: TEXT ('analysis' | 'export' | 'chat')
+- project_name: TEXT
+- file_count: INTEGER
+- metadata: JSONB
+- created_at: TIMESTAMPTZ
+```
+
+#### 4. payments
+```sql
+- id: UUID (PK)
+- user_id: UUID (FK to users)
+- stripe_payment_intent_id: TEXT (unique)
+- amount: INTEGER (cents)
+- currency: TEXT (default 'usd')
+- status: TEXT ('pending' | 'succeeded' | 'failed' | 'canceled')
+- plan_type: TEXT ('pro')
+- metadata: JSONB
+- created_at: TIMESTAMPTZ
+- updated_at: TIMESTAMPTZ
+```
+
+#### 5. project_analyses (optional storage)
+```sql
+- id: UUID (PK)
+- user_id: UUID (FK to users)
+- project_name: TEXT
+- file_count: INTEGER
+- analysis_data: JSONB
+- documentation_content: TEXT
+- created_at: TIMESTAMPTZ
+```
+
+### Stripe Integration Tables
+
+#### 6. stripe_customers
+```sql
+- id: BIGINT (PK)
+- user_id: UUID (FK to auth.users, unique)
+- customer_id: TEXT (unique)
+- created_at: TIMESTAMPTZ
+- updated_at: TIMESTAMPTZ
+- deleted_at: TIMESTAMPTZ
+```
+
+#### 7. stripe_subscriptions
+```sql
+- id: BIGINT (PK)
+- customer_id: TEXT (unique)
+- subscription_id: TEXT
+- price_id: TEXT
+- current_period_start: BIGINT
+- current_period_end: BIGINT
+- cancel_at_period_end: BOOLEAN
+- payment_method_brand: TEXT
+- payment_method_last4: TEXT
+- status: stripe_subscription_status (enum)
+- created_at: TIMESTAMPTZ
+- updated_at: TIMESTAMPTZ
+- deleted_at: TIMESTAMPTZ
+```
+
+#### 8. stripe_orders
+```sql
+- id: BIGINT (PK)
+- checkout_session_id: TEXT
+- payment_intent_id: TEXT
+- customer_id: TEXT
+- amount_subtotal: BIGINT
+- amount_total: BIGINT
+- currency: TEXT
+- payment_status: TEXT
+- status: stripe_order_status (enum)
+- created_at: TIMESTAMPTZ
+- updated_at: TIMESTAMPTZ
+- deleted_at: TIMESTAMPTZ
+```
+
+### Database Functions
+
+#### Core Functions
+1. **handle_new_user()** - Trigger function for new user signup
+2. **increment_usage_count()** - Safely increment user usage
+3. **can_use_feature()** - Check if user has remaining usage
+4. **upgrade_user_to_pro()** - Upgrade user subscription
+5. **update_updated_at_column()** - Auto-update timestamps
+
+### Row Level Security (RLS)
+- All tables have RLS enabled
+- Users can only access their own data
+- Service role has full access for webhooks
+- Authenticated users have read/write on own records
+
+## 🔧 CORE COMPONENTS
+
+### Authentication Components
+- **AuthPage** (`src/components/AuthPage.tsx`)
+  - Handles sign in/sign up
+  - Email verification flow
+  - Form validation
+  - Redirects after auth
+
+- **ProtectedRoute** (`src/components/ProtectedRoute.tsx`)
+  - Route protection wrapper
+  - Email verification check
+  - Loading states
+
+### Main Application Components
+- **AppPage** (`src/components/AppPage.tsx`)
+  - Main application interface
+  - File upload handling
+  - Project analysis orchestration
+  - Usage tracking integration
+
+- **LandingPage** (`src/components/LandingPage.tsx`)
+  - Marketing homepage
+  - Feature showcase
+  - Pricing information
+  - Call-to-action sections
+
+### Core Feature Components
+- **FileUploader** (`src/components/FileUploader.tsx`)
+  - Drag & drop file upload
+  - ZIP file support
+  - File validation
+  - Progress indication
+
+- **FileTree** (`src/components/FileTree.tsx`)
+  - Project structure visualization
+  - Expandable directory tree
+  - File selection handling
+  - Icon mapping by file type
+
+- **DocumentViewer** (`src/components/DocumentViewer.tsx`)
+  - Generated documentation display
+  - Multiple view modes (preview/raw/AI)
+  - Export functionality
+  - Search capabilities
+
+- **CodebaseChatbot** (`src/components/CodebaseChatbot.tsx`)
+  - AI-powered code assistant
+  - Context-aware responses
+  - Code snippet display
+  - Usage tracking
+
+### Subscription & Payment Components
+- **UsageIndicator** (`src/components/UsageIndicator.tsx`)
+  - Usage progress display
+  - Plan type indication
+  - Upgrade prompts
+
+- **UpgradeModal** (`src/components/UpgradeModal.tsx`)
+  - Stripe checkout integration
+  - Plan comparison
+  - Payment processing
+
+### Processing Components
+- **ProcessingIndicator** (`src/components/ProcessingIndicator.tsx`)
+  - Loading states
+  - Progress tracking
+  - Status messages
+
+- **FilterControls** (`src/components/FilterControls.tsx`)
+  - File filtering options
+  - Analysis configuration
+  - User preferences
+
+## 🔄 CONTEXTS & STATE MANAGEMENT
+
+### AuthContext (`src/contexts/AuthContext.tsx`)
+**Purpose:** Centralized authentication and subscription management
+
+**State:**
+- `user`: Current authenticated user
+- `session`: Supabase session
+- `subscription`: User subscription data
+- `loading`: Authentication loading state
+- `emailVerificationSent`: Email verification status
+
+**Methods:**
+- `signUp(email, password, fullName)`: User registration
+- `signIn(email, password)`: User authentication
+- `signOut()`: User logout
+- `resendVerification(email)`: Resend verification email
+- `refreshSubscription()`: Reload subscription data
+- `canUseFeature()`: Check usage limits
+- `incrementUsage(type, project, fileCount)`: Track usage
+
+## 🛠️ UTILITY MODULES
+
+### File Processing (`src/utils/fileProcessor.ts`)
+**Purpose:** Handle file uploads and project structure analysis
+
+**Key Functions:**
+- `processFiles(files, options)`: Process uploaded files
+- `processZipFile(file)`: Extract ZIP archives
+- `extractPackageJson(structure)`: Find and parse package.json
+- `getSourceFiles(structure)`: Filter source code files
+- `detectProjectType(structure, packageInfo)`: Identify project framework
+
+### Code Analysis (`src/utils/codeParser.ts`)
+**Purpose:** Parse and analyze source code
+
+**Key Functions:**
+- `parseJavaScriptFile(content, path)`: Analyze JS files
+- `parseTypeScriptFile(content, path)`: Analyze TS files
+- `parseFunctions(content, analysis)`: Extract function definitions
+- `parseClasses(content, analysis)`: Extract class definitions
+- `parseInterfaces(content, analysis)`: Extract TypeScript interfaces
+
+### File Filtering (`src/utils/fileFilter.ts`)
+**Purpose:** Smart file filtering and categorization
+
+**Key Functions:**
+- `filterProject(structure, options)`: Apply filtering rules
+- `shouldAnalyzeFile(file)`: Determine if file should be analyzed
+- `isMinifiedCode(content, fileName)`: Detect minified files
+- `categorizeFile(fileName, content)`: Assign file categories
+
+### Documentation Generation (`src/utils/documentGenerator.ts`)
+**Purpose:** Generate comprehensive documentation
+
+**Key Functions:**
+- `generate(analysis)`: Create documentation from analysis
+- `generateStandardDoc()`: Standard markdown format
+- `generateAIOptimizedDoc()`: AI assistant optimized format
+- `generateOverview()`: Project overview section
+- `generateArchitecture()`: Architecture documentation
+
+### Dependency Analysis (`src/utils/dependencyAnalyzer.ts`)
+**Purpose:** Analyze project dependencies and architecture
+
+**Key Functions:**
+- `analyzeDependencies(packageJson)`: Categorize dependencies
+- `detectBuildTool(packageJson)`: Identify build tools
+- `detectArchitecturePatterns()`: Identify design patterns
+
+### AI Integration (`src/utils/codebaseChatService.ts`)
+**Purpose:** AI-powered codebase assistance
+
+**Key Functions:**
+- `processQuery(query)`: Handle user questions
+- `processLocalQuery(query)`: Local pattern matching
+- `processAIQuery(query)`: Gemini AI integration
+- `createAIPrompt(query)`: Generate AI prompts
+
+### Workflow Analysis (`src/utils/workflowAnalyzer.ts`)
+**Purpose:** Advanced codebase workflow analysis
+
+**Key Functions:**
+- `analyzeProject()`: Comprehensive project analysis
+- `extractRoutes()`: Find API routes and endpoints
+- `analyzeUserInteractions()`: Analyze UI components
+- `analyzeDataOperations()`: Find database operations
+- `analyzeAuthenticationFlow()`: Identify auth patterns
+
+### Gemini Integration (`src/utils/geminiWorkflowGenerator.ts`)
+**Purpose:** AI-powered workflow and user story generation
+
+**Key Functions:**
+- `generateWorkflowsAndStories()`: Generate comprehensive documentation
+- `createComprehensivePrompt()`: Create detailed AI prompts
+- `parseGeminiResponse()`: Parse AI responses
+- `validateAndEnhanceResponse()`: Validate and enhance AI output
+
+## 🔌 EXTERNAL INTEGRATIONS
+
+### Supabase Client (`src/lib/supabase.ts`)
+**Configuration:**
+- URL: `VITE_SUPABASE_URL`
+- Anon Key: `VITE_SUPABASE_ANON_KEY`
+
+**Database Helpers:**
+- `getUserSubscription(authUserId)`: Get user subscription
+- `canUseFeature(authUserId)`: Check feature access
+- `incrementUsage()`: Track usage with limits
+- `upgradeUserToPro()`: Upgrade subscription
+- `getUserUsageLogs()`: Get usage history
+
+**Real-time Subscriptions:**
+- `subscribeToUserSubscription()`: Listen to subscription changes
+- `subscribeToUsageLogs()`: Listen to usage updates
+
+### Stripe Integration (`src/lib/stripe-client.ts`)
+**Configuration:**
+- Publishable Key: `VITE_STRIPE_PUBLISHABLE_KEY`
+
+**Functions:**
+- `createCheckoutSession()`: Create Stripe checkout
+- `getUserSubscription()`: Get Stripe subscription data
+- `getUserOrders()`: Get order history
+
+**Product Configuration (`src/stripe-config.ts`):**
+```javascript
+{
+  id: 'prod_SaYZOvE2BoSG5K',
+  name: 'project lens',
+  priceId: 'price_1RfNRsHKucUAhi1f4gKPYoIi',
+  price: 3.00,
+  mode: 'subscription',
+  features: [
+    '15 additional project analyses',
+    'Advanced AI documentation',
+    'Priority support',
+    'Export to multiple formats',
+    'Codebase chatbot'
+  ]
+}
+```
+
+## 🔒 AUTHENTICATION FLOW
+
+### User Registration
+1. User submits email/password/name
+2. Supabase creates auth.users record
+3. Database trigger (`handle_new_user`) creates:
+   - users table record
+   - user_subscriptions record (free plan, 5 usage limit)
+4. Email verification sent
+5. User must verify email to access app
+
+### User Login
+1. User submits credentials
+2. Supabase validates and creates session
+3. AuthContext loads user and subscription data
+4. User redirected to main app
+
+### Email Verification
+1. User receives verification email
+2. Clicks verification link
+3. Supabase confirms email
+4. User can access protected routes
+
+## 💳 PAYMENT FLOW
+
+### Upgrade Process
+1. User clicks upgrade button
+2. `UpgradeModal` opens with Stripe checkout
+3. `createCheckoutSession()` called with:
+   - Price ID: `price_1RfNRsHKucUAhi1f4gKPYoIi`
+   - Mode: `subscription`
+   - Success/cancel URLs
+4. User redirected to Stripe checkout
+5. Payment processed by Stripe
+6. Webhook updates subscription data
+7. User redirected back with success status
+
+### Webhook Processing
+**Stripe Webhook** (`supabase/functions/stripe-webhook/index.ts`):
+- Handles `checkout.session.completed`
+- Handles `payment_intent.succeeded`
+- Updates `stripe_subscriptions` table
+- Creates `stripe_orders` records
+
+## 📊 USAGE TRACKING
+
+### Usage Limits
+- **Free Plan:** 5 analyses
+- **Pro Plan:** 20 analyses (5 free + 15 pro)
+
+### Tracked Actions
+1. **Analysis:** Project file analysis
+2. **Export:** Documentation export
+3. **Chat:** AI chatbot usage
+
+### Usage Flow
+1. User attempts action
+2. `canUseFeature()` checks current usage vs limit
+3. If allowed, `incrementUsage()` called:
+   - Increments `usage_count` in `user_subscriptions`
+   - Creates record in `usage_logs`
+4. If limit reached, upgrade modal shown
+
+## 🎨 STYLING & DESIGN
+
+### Design System
+- **Primary Colors:** Blue (#2563eb) to Indigo (#4f46e5) gradients
+- **Secondary Colors:** Slate grays for text and backgrounds
+- **Accent Colors:** Emerald, Amber, Red for status indicators
+- **Typography:** System fonts with Tailwind typography scale
+- **Spacing:** 8px grid system
+- **Animations:** Framer Motion for smooth transitions
+
+### Component Patterns
+- **Cards:** White background, subtle shadows, rounded corners
+- **Buttons:** Gradient backgrounds, hover states, loading states
+- **Forms:** Clean inputs with focus states and validation
+- **Modals:** Backdrop blur, smooth animations, escape handling
+- **Navigation:** Clean header with user info and actions
+
+## 🔧 DEVELOPMENT WORKFLOW
+
+### Environment Setup
+```bash
+npm install          # Install dependencies
+npm run dev         # Start development server
+npm run build       # Build for production
+npm run preview     # Preview production build
+```
+
+### Environment Variables
+```
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
+VITE_GEMINI_API_KEY=your_gemini_api_key
+```
+
+### Database Migrations
+Located in `supabase/migrations/`:
+- `20250629152134_bronze_crystal.sql` - Initial schema
+- `20250629152633_frosty_shrine.sql` - Core tables and functions
+- `20250629153418_empty_bread.sql` - Complete schema with RLS
+- `20250629154744_odd_river.sql` - Stripe integration
+- `20250629212535_hidden_darkness.sql` - User signup fixes
+
+## 🚀 DEPLOYMENT
+
+### Frontend (Netlify)
+- **Build Command:** `npm run build`
+- **Publish Directory:** `dist`
+- **Environment Variables:** Set in Netlify dashboard
+- **Domain:** https://zippy-gecko-62f464.netlify.app
+
+### Backend (Supabase)
+- **Database:** Managed PostgreSQL
+- **Edge Functions:** Auto-deployed from `supabase/functions/`
+- **Authentication:** Configured with email verification
+- **Storage:** Not used (files processed in browser)
+
+### Edge Functions
+1. **stripe-checkout** (`supabase/functions/stripe-checkout/index.ts`)
+   - Creates Stripe checkout sessions
+   - Manages customer creation
+   - Handles subscription setup
+
+2. **stripe-webhook** (`supabase/functions/stripe-webhook/index.ts`)
+   - Processes Stripe webhooks
+   - Updates subscription status
+   - Records payment data
+
+## 📈 MONITORING & ANALYTICS
+
+### Usage Analytics
+- All user actions logged in `usage_logs`
+- Subscription status tracked in real-time
+- Payment history in `payments` table
+
+### Error Handling
+- Try-catch blocks in all async operations
+- User-friendly error messages
+- Console logging for debugging
+- Graceful fallbacks for API failures
+
+## 🔍 TESTING STRATEGY
+
+### Manual Testing Checklist
+1. **Authentication:**
+   - Sign up with email verification
+   - Sign in/out functionality
+   - Protected route access
+
+2. **File Processing:**
+   - Upload various file types
+   - ZIP file extraction
+   - Large file handling
+
+3. **Analysis Features:**
+   - Project structure analysis
+   - Documentation generation
+   - AI chatbot responses
+
+4. **Subscription Management:**
+   - Usage limit enforcement
+   - Upgrade flow
+   - Payment processing
+
+5. **UI/UX:**
+   - Responsive design
+   - Loading states
+   - Error handling
+
+## 🔐 SECURITY CONSIDERATIONS
+
+### Data Protection
+- All user data protected by RLS
+- No sensitive data in client-side code
+- Secure API key management
+- HTTPS everywhere
+
+### Authentication Security
+- Email verification required
+- Secure session management
+- Protected routes
+- Automatic logout on token expiry
+
+### Payment Security
+- Stripe handles all payment data
+- No card details stored locally
+- Webhook signature verification
+- Secure customer data handling
+
+## 📚 KEY DEPENDENCIES
+
+### Production Dependencies
+```json
+{
+  "@stripe/stripe-js": "^2.4.0",
+  "@supabase/supabase-js": "^2.39.0",
+  "framer-motion": "^10.18.0",
+  "jszip": "^3.10.1",
+  "lucide-react": "^0.344.0",
+  "prismjs": "^1.29.0",
+  "react": "^18.3.1",
+  "react-dom": "^18.3.1",
+  "react-router-dom": "^6.20.1"
+}
+```
+
+### Development Dependencies
+```json
+{
+  "@vitejs/plugin-react": "^4.3.1",
+  "autoprefixer": "^10.4.18",
+  "tailwindcss": "^3.4.1",
+  "typescript": "^5.5.3",
+  "vite": "^5.4.2"
+}
+```
+
+## 🎯 BUSINESS LOGIC
+
+### Core Value Proposition
+- **Problem:** Developers need comprehensive documentation for AI coding assistants
+- **Solution:** Automated analysis and AI-optimized documentation generation
+- **Target Users:** Individual developers, small teams, enterprises
+
+### Revenue Model
+- **Freemium:** 5 free analyses to try the product
+- **Pro Plan:** $3 one-time payment for 15 additional analyses
+- **Future:** Potential monthly subscriptions for teams/enterprises
+
+### Key Metrics
+- User registrations and email verifications
+- Analysis usage and conversion rates
+- Payment completion rates
+- User retention and engagement
+
+## 🔮 FUTURE ENHANCEMENTS
+
+### Planned Features
+1. **Team Collaboration:** Shared projects and team management
+2. **Advanced AI:** More sophisticated code analysis
+3. **Integrations:** GitHub, GitLab, VS Code extensions
+4. **Templates:** Custom documentation templates
+5. **Analytics:** Usage analytics dashboard
+
+### Technical Improvements
+1. **Performance:** Code splitting and lazy loading
+2. **Offline Support:** Service worker implementation
+3. **Mobile App:** React Native version
+4. **API:** Public API for integrations
+5. **Webhooks:** Custom webhook support
+
+## 📞 SUPPORT & MAINTENANCE
+
+### Error Monitoring
+- Console logging for debugging
+- User-friendly error messages
+- Graceful degradation
+- Retry mechanisms for API calls
+
+### Performance Monitoring
+- Bundle size optimization
+- Lazy loading implementation
+- Image optimization
+- CDN usage for static assets
+
+### Maintenance Tasks
+- Regular dependency updates
+- Security patch management
+- Database backup verification
+- Performance optimization
+
+---
+
+## 🏁 CONCLUSION
+
+Project Lens is a comprehensive SaaS application that combines modern web technologies with AI capabilities to solve a real problem for developers. The architecture is designed for scalability, security, and maintainability, with clear separation of concerns and robust error handling.
+
+The codebase follows React best practices, implements proper TypeScript typing, and uses modern development tools. The subscription system is production-ready with Stripe integration, and the database schema supports complex business logic while maintaining data integrity.
+
+This context document serves as the single source of truth for understanding the entire codebase, from high-level architecture to implementation details. It should be updated as the project evolves to maintain accuracy and usefulness for all team members.
+
+**Last Updated:** December 2024
+**Version:** 1.0.0
+**Maintainer:** Development Team
